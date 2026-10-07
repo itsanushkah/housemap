@@ -4,4 +4,4 @@
 
 Live site: https://itsanushkah.github.io/housemap/
 
-Credits: Sofa, chair, pouf, lamp, flower and plant models are glTF sample assets by Wayfair, DGG and Khronos (CC BY 4.0).
+Credits: Sofa, chair, pouf, lamp, flower and plant models are glTF sample assets by Wayfair, DGG and Khronos (CC BY 4.0). Some fabrics have been recoloured to match the interiors.

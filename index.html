@@ -784,7 +784,7 @@ function snakeProc(p, x, z, s = 1) {
 function urn(p, x, y, z, s = 1, mat = M.terracotta) { C(p, mat, .2 * s, .32 * s, .5 * s, x, y, z, 20); S(p, mat, .36 * s, x, y + .55 * s, z, 2); C(p, mat, .14 * s, .2 * s, .45 * s, x, y + .8 * s, z, 16); }
 function vase(p, x, y, z, s = 1, mat = M.ceramic) { if (mat === M.terracotta) return urn(p, x, y, z, s, mat); model('flowers', p, x, y, z, rnd() * 6.28, { h: 1.7 * s }, () => urn(p, x, y, z, s, M.ceramic)); }
 function candle(p, x, y, z, s = 1) { model('candle', p, x, y, z, rnd() * 6.28, { h: 1.1 * s }); }
-function pouf(p, x, z, s = 1) { model('pouf', p, x, 0, z, rnd() * 6.28, { h: 1.45 * s }, () => RB(p, M.velvetOlive, 1.6 * s, 1.4 * s, 1.6 * s, x, 0, z, .45)); }
+function pouf(p, x, z, s = 1) { model('pouf', p, x, 0, z, rnd() * 6.28, { w: 2.3 * s }, () => RB(p, M.velvetOlive, 1.6 * s, 1.4 * s, 1.6 * s, x, 0, z, .45)); }
 function bookStack(p, x, y, z, n = 3) { let yy = y; for (let i = 0; i < n; i++) { const h = .12 + rnd() * .06; const m = B(p, M.books[(i * 3 + Math.floor(rnd() * 8)) % 8], 1.1 - i * .1, h, .8 - i * .05, x, yy, z); m.rotation.y = (rnd() - .5) * .3; yy += h; } return yy; }
 function bowl(p, x, y, z, s = 1) { const m = new T.Mesh(new T.SphereGeometry(.45 * s, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M.brass); m.position.set(x, y + .45 * s, z); m.castShadow = true; p.add(m); }
 
@@ -816,6 +816,8 @@ function armchairProc(p, x, z, ry, mat = M.leather) {
   RB(g, M.linen, 1.1, 1, .3, 0, 1.15, -.7, .2).rotation.x = -.2;
   return g;
 }
+function leatherSofa(p, len, x, z, ry) { model('leatherSofa', p, x, 0, z, ry, { w: len }, () => sofaProc(p, len, x, z, ry, M.leather, 3.1, [M.velvetRust, M.linenSand])); }
+function accentChair(p, x, z, ry) { model('damaskChair', p, x, 0, z, ry, { m: 1.15 }, () => armchairProc(p, x, z, ry, M.velvetOlive)); }
 function caneChair(p, x, z, ry) {
   const g = G(p, x, 0, z, ry);
   legs(g, 2.2, 2.2, 0, 0, 1.4, M.walnut, .07);
@@ -838,6 +840,8 @@ function coffeeRound(p, x, z, r = 1.8) {
 }
 function sideTable(p, x, z, mat = M.walnut) { blob(p, 2.6, 2.6, x, z); C(p, mat, .9, .9, 1.7, x, 0, z, 24); C(p, M.statuario, .95, .95, .08, x, 1.7, z, 24); vase(p, x, 1.78, z, .5); }
 function floorLamp(p, x, z, ry = 0) { lightAt(p, x, 5, z); floorLampProc(p, x, z, ry); }
+// the lamp model's shade hangs ~2ft off the pole on its -x side; ry turns it
+function floorLampModel(p, x, z, ry = 0) { lightAt(p, x, 5, z); model('lamp', p, x, 0, z, ry, { h: 5.8 }, () => floorLampProc(p, x, z, ry)); }
 function floorLampProc(p, x, z, ry = 0) {
   const g = G(p, x, 0, z, ry);
   C(g, M.statuario, .7, .7, .18, 0, 0, 0, 24); C(g, M.brass, .05, .05, 5.2, 0, .18, 0, 8);
@@ -989,7 +993,7 @@ function bedroom(r) {
     const s = (W - 7.8) / 2 - .4;
     if (s > 2.2) [-1, 1].forEach(sg => wardrobe(g, s, sg * (3.8 + s / 2 + .1), front - 1.05));
   }
-  if (r.id === 'bed3') { armchair(g, L + 2, front - 3, aim(L + 2, front - 3, 0, 0), M.velvetOlive); floorLamp(g, L + 1, front - 1.2, Math.PI / 2); }
+  if (r.id === 'bed3') { pouf(g, bx - 3.9, bz + 4.6, .9); armchair(g, L + 2, front - 3, aim(L + 2, front - 3, 0, 0), M.velvetOlive); floorLamp(g, L + 1, front - 1.2, Math.PI / 2); }
   else if (W > 14) { armchair(g, R - 1.9, front - (D > 13 ? 4.5 : 2), aim(R - 1.9, front - (D > 13 ? 4.5 : 2), bx, bz + 1.5), M.velvetOlive); floorLamp(g, R - .8, front - (D > 13 ? 6.5 : 4), Math.PI); }
   if (W > 15 && r.id !== 'bed3') tallPlant(g, L + 1.3, front - 1.6, .8);
   if (r.id === 'bed3') { // study corner on the wall away from the bathroom doors
@@ -1141,9 +1145,9 @@ function bar(r) {
   B(P, M.ledStrip, 10, .04, .05, 14.5, .15, 5.85, { cast: false });
   [10.8, 13.3, 15.8, 18.3].forEach(x => stool(P, x, 6.9));
   [11, 14.5, 18].forEach(x => pendant(P, x, 4.8, 10.2, 7.2, 'globe'));
-  armchair(P, 3, 4.2, aim(3, 4.2, 4.9, 6.2), M.leather); armchair(P, 3, 8.2, aim(3, 8.2, 4.9, 6.2), M.leather);
-  C(P, M.walnut, .9, .9, 1.5, 4.9, 0, 6.2, 20); C(P, M.statuario, 1, 1, .08, 4.9, 1.5, 6.2, 24);
-  rug(P, 6, 6, 4.2, 6.2); plant(P, 20.4, 9.5, .7); art(P, .5, 6.4, 6.2, Math.PI / 2, 3, 2.2);
+  leatherSofa(P, 7, 1.85, 6.6, Math.PI / 2); // faces the counter, clear of the door swing at the north end
+  C(P, M.walnut, .9, .9, 1.5, 5.3, 0, 6.6, 20); C(P, M.statuario, 1, 1, .08, 5.3, 1.5, 6.6, 24);
+  rug(P, 6.6, 7.6, 3.8, 6.6); plant(P, 20.4, 9.5, .7); art(P, .5, 6.4, 6.2, Math.PI / 2, 3, 2.2);
 }
 function living(r) {
   const P = at(r); // 24..53.7 x 25.5..44
@@ -1151,6 +1155,7 @@ function living(r) {
   sofa(P, 8.8, 21.6, 3.2, 0, M.linen); sofa(P, 7.2, 27.4, 9.4, -Math.PI / 2, M.linenSand);
   rug(P, 14, 11, 21.6, 9.2);
   coffeeRound(P, 21.4, 9.4, 1.9); candle(P, 22.2, 1.14, 10, .8);
+  pouf(P, 19.6, 12.7); pouf(P, 23.2, 12.9, .9);
   sideTable(P, 27.6, 2.4);
   armchair(P, 15.6, 7.4, aim(15.6, 7.4, 21.4, 9.4), M.velvetRust); armchair(P, 15.8, 12.2, aim(15.8, 12.2, 21.4, 9.4), M.velvetRust);
   floorLamp(P, 15.3, 4.6, Math.PI * .75);
@@ -1192,7 +1197,7 @@ function drawing(r) {
   B(P, M.walnut, 4.6, 1.1, 2.6, 9.5, 0, 7.8); B(P, M.statuario, 4.8, .1, 2.8, 9.5, 1.1, 7.8, { tile: 0 });
   bookStack(P, 8.6, 1.2, 7.6, 3); bowl(P, 10.6, 1.2, 8, .6);
   crystalChandelier(P, 9.5, 7.8, 8.2, 2);
-  tallPlant(P, 1.6, 1.6); snake(P, 19.6, 14, .9);
+  tallPlant(P, 1.6, 1.6); snake(P, 19.6, 14, .9); floorLampModel(P, 3.2, 13.4, Math.PI);
   B(P, M.walnut, 1.6, 2.6, 5, 20, 0, 8); vase(P, 20, 2.6, 6.8, .6); bookStack(P, 20, 2.6, 9.2, 3);
   art(P, 20.3, 7, 8, -Math.PI / 2, 4.2, 3, M.art);
 }
@@ -1218,7 +1223,7 @@ function lounge(r) {
   sofa(P, 8, 3.4, 9.25, Math.PI / 2, M.linenSand);
   coffeeRound(P, 7.6, 9.25, 1.5);
   armchair(P, 11.3, 5.8, aim(11.3, 5.8, 7.6, 9.25), M.velvetRust); armchair(P, 11.3, 12.7, aim(11.3, 12.7, 7.6, 9.25), M.velvetRust);
-  sideTable(P, 3.4, 4.3); sideTable(P, 3.4, 14.2); floorLamp(P, 1.6, 15.6, Math.PI / 2);
+  sideTable(P, 3.4, 4.3); sideTable(P, 3.4, 14.2); floorLampModel(P, 1.5, 15.6, -Math.PI / 2);
   tallPlant(P, 1.6, 1.6, .9);
   pendant(P, 7.6, 9.25, 10.2, 7.2, 'cane');
   // reading nook in the corridor towards the box room
@@ -1230,7 +1235,7 @@ function lobby(r) {
   if (r.id !== 'lob2') return;
   const P = at(r); plant(P, 1.6, 8.4, .8, 0, M.terracotta); tallPlant(P, 11.6, 8.4, .8);
   B(P, M.plaster, .1, 9, 4, .5, 0, 7.3); art(P, .6, 6.4, 7.3, Math.PI / 2, 2.4, 3.2);
-  caneChair(P, 3.4, 7.6, Math.PI / 2);
+  accentChair(P, 3, 6.6, aim(3, 6.6, 7, 3.5));
 }
 function outdoor(r) {
   const P = at(r), w = r.x1 - r.x0, d = r.z1 - r.z0;
@@ -1432,6 +1437,23 @@ function prepModel(root) {
   root.updateMatrixWorld(true);
 }
 const TINT = { pouf: 0xc49a6c }, TINT_CACHE = {};
+// recolour a patterned fabric texture into two tones (dark ground, light motif) so the pattern survives the restyle
+const DUOTONE = { damaskChair: [0x3f4a2a, 0xd4b06a] };
+function duotone(root, dark, light) {
+  const c0 = new T.Color(dark), c1 = new T.Color(light);
+  root.traverse(o => { if (!o.isMesh) return; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+    if (!/fabric/i.test(m.name || '') || !m.map || !m.map.image) return;
+    const img = m.map.image, cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+    const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0); const d = cx.getImageData(0, 0, cv.width, cv.height), px = d.data;
+    let lo = 1, hi = 0; for (let i = 0; i < px.length; i += 4) { const l = (px[i] * .3 + px[i + 1] * .59 + px[i + 2] * .11) / 255; lo = Math.min(lo, l); hi = Math.max(hi, l); }
+    for (let i = 0; i < px.length; i += 4) {
+      const t = ((px[i] * .3 + px[i + 1] * .59 + px[i + 2] * .11) / 255 - lo) / Math.max(.01, hi - lo);
+      px[i] = 255 * (c0.r + (c1.r - c0.r) * t); px[i + 1] = 255 * (c0.g + (c1.g - c0.g) * t); px[i + 2] = 255 * (c0.b + (c1.b - c0.b) * t);
+    }
+    cx.putImageData(d, 0, 0); const tex = m.map.clone(); tex.image = cv; tex.needsUpdate = true; m.map = tex; m.color.set(0xffffff);
+    if (m.sheenColor) m.sheenColor.copy(c1).multiplyScalar(.5); if (m.specularColor) m.specularColor.set(0xffffff); // the source fabric gets its purple from sheen/specular
+  }); });
+}
 function placeModel(p) {
   const c = MODEL_CACHE[p.key]; if (!c) return;
   const inst = c.scene.clone(true), size = c.size, center = c.center;
@@ -1474,6 +1496,7 @@ function loadModels() {
     const done = () => { modelsPending--; if (status) { if (errs.length) status.textContent = 'Some furniture failed: ' + errs.join(' | '); else status.hidden = modelsPending <= 0; } };
     fetchGlb(url).then(buf => loader.parse(buf, '', g => {
       prepModel(g.scene);
+      if (DUOTONE[k]) duotone(g.scene, ...DUOTONE[k]);
       if (TINT[k]) g.scene.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.color && m.color.set(TINT[k]); if (m.sheenColor) m.sheenColor.set(0xe8c9a0); }); });
       const box = new T.Box3().setFromObject(g.scene), size = new T.Vector3(), center = new T.Vector3(); box.getSize(size); box.getCenter(center);
       MODEL_CACHE[k] = { scene: g.scene, box, size, center };
