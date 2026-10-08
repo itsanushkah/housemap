@@ -457,11 +457,13 @@ function RB(p, mat, w, h, d, x, y, z, r = .2) {
 })();
 
 /* ---------- merge static meshes into one draw call per material ---------- */
-function mergeGroup(root) {
+const FOOT = { g: [], f: [], s: [] }; // world boxes of every piece of furniture, kept for walking routes once the meshes are merged
+function mergeGroup(root, foot) {
   root.updateMatrixWorld(true);
-  const inv = new T.Matrix4().copy(root.matrixWorld).invert(), buckets = new Map(), kill = [], mtx = new T.Matrix4();
+  const inv = new T.Matrix4().copy(root.matrixWorld).invert(), buckets = new Map(), kill = [], mtx = new T.Matrix4(), bb = new T.Box3();
   root.traverse(o => {
     if (!o.isMesh || o.userData.keep) return;
+    if (foot) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); foot.push(bb.clone()); }
     const key = o.material.uuid + (o.castShadow ? '1' : '0');
     const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
     g.applyMatrix4(mtx.multiplyMatrices(inv, o.matrixWorld));
@@ -476,7 +478,7 @@ function mergeGroup(root) {
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.BufferAttribute(P, 3)); geo.setAttribute('normal', new T.BufferAttribute(N, 3)); geo.setAttribute('uv', new T.BufferAttribute(U, 2));
     geo.computeBoundingSphere();
-    const m = new T.Mesh(geo, b.mat); m.castShadow = b.cast; m.receiveShadow = true; root.add(m);
+    const m = new T.Mesh(geo, b.mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.merged = true; root.add(m);
   });
 }
 /* ---------- floors & rooms (feet; x = left→right across 60′ frontage, z = back→front over 75′ depth) ---------- */
@@ -718,9 +720,15 @@ function buildFloors(f) {
     const m = B(P, floorMat(r), w + (f === 'g' ? 0 : .01), thick, d, (r.x0 + r.x1) / 2, top - thick, (r.z0 + r.z1) / 2);
     m.userData.room = r.id; m.userData.keep = true; floorPick.push(m);
   });
-  if (f === 's') { // terrace slab = roof of first floor
-    const m = B(FG.s.stuff, M.paving, 60, .6, 65, 30, 23.4, 32.5); m.userData.room = 'terrace'; m.userData.keep = true; floorPick.push(m);
+  if (f === 's') { // terrace slab = roof of first floor, open over the stair flight below
+    const hole = ROOMS.find(q => q.f === 'f' && q.type === 'stair'), hx = hole.x1 - 1.6 - 15 * .95 + 9 * .95, hz0 = ROOM.stairS.z0, hz1 = ROOM.stairS.z1;
+    [[0, 60, 0, hz0], [0, 60, hz1, 65], [0, ROOM.stairS.x0, hz0, hz1], [hx, 60, hz0, hz1]].forEach(([x0, x1, z0, z1]) => {
+      const m = B(FG.s.stuff, M.paving, x1 - x0, .6, z1 - z0, (x0 + x1) / 2, 23.4, (z0 + z1) / 2); m.userData.room = 'terrace'; m.userData.keep = true; floorPick.push(m); });
   }
+  if (f === 'f') ROOMS.filter(r => r.f === f && r.type === 'stair').forEach(r => { // landings: arrival from the flight below, and the foot of the next flight
+    const below = ROOMS.find(q => q.f === 'g' && q.type === 'stair'), mid = (r.z0 + r.z1) / 2, arrive = below.x1 - 1.6 - 15 * .95 + 9 * .95;
+    [[arrive, r.x1, r.z0, mid], [r.x1 - 1.6, r.x1, mid, r.z1]].forEach(([x0, x1, z0, z1]) => B(FG[f].stuff, floorMat(r), x1 - x0, .6, z1 - z0, (x0 + x1) / 2, lv - .6, (z0 + z1) / 2));
+  });
   // false ceilings (visible only when you walk inside)
   ROOMS.filter(r => r.f === f && !OUTDOOR.has(r.type) && !['void', 'stair', 'lift', 'terrace'].includes(r.type)).forEach(r => ceiling(r.id === 'living' ? { ...r, x1: 39.3 } : r));
   if (f === 'g') { // the living room is double height under the first-floor void
@@ -1123,10 +1131,15 @@ function lift(r) {
 }
 function store(r) {
   const { g, W, D, back, L, R } = frame(r, 'N');
+  if (r.id === 'box') { // closed cabinets on the wall shared with the master suite (open slats read as a gate)
+    wardrobe(g, W - 1.6, 0, back + 1.05, 2, 8.4);
+    RB(g, M.linenSand, 3.4, 1.4, 6.6, L + 2, 0, .8, .3); RB(g, M.linen, 3.2, .3, 6.2, L + 2, 1.4, .8, .1);
+    [-.8, 1.2].forEach((z, i) => { const c = RB(g, i ? M.velvetRust : M.velvetOlive, 1.3, 1.1, .4, L + .75, 1.7, .8 + z, .2); c.rotation.y = Math.PI / 2; });
+    plant(g, R - 1, D / 2 - 1.2, .7); return;
+  }
   for (let y = 0; y < 4; y++) B(g, M.oak, W - 1.2, .1, 1.5, 0, .3 + y * 2, back + .8);
   [L + .2, R - .2].forEach(x => B(g, M.oak, .1, 7, 1.5, x, 0, back + .8));
   for (let i = 0; i < 10; i++) B(g, [M.linen, M.cane, M.linenSand][i % 3], 1 + rnd(), .9, 1, L + 1 + rnd() * (W - 3), .4 + Math.floor(rnd() * 3) * 2, back + .8);
-  if (r.id === 'box') { RB(g, M.linenSand, 3.4, 1.4, 6.6, L + 2, 0, .8, .3); RB(g, M.linen, 3.2, .3, 6.2, L + 2, 1.4, .8, .1); plant(g, R - 1, D / 2 - 1.2, .7); }
 }
 function puja(r) {
   const { g, back } = frame(r, 'S');
@@ -1245,7 +1258,7 @@ function lounge(r) {
   sofa(P, 8, 3.4, 9.25, Math.PI / 2, M.linenSand);
   coffeeRound(P, 7.6, 9.25, 1.5);
   armchair(P, 11.3, 5.8, aim(11.3, 5.8, 7.6, 9.25), M.velvetRust); armchair(P, 11.3, 12.7, aim(11.3, 12.7, 7.6, 9.25), M.velvetRust);
-  sideTable(P, 3.4, 4.3); sideTable(P, 3.4, 14.2); floorLampModel(P, 1.5, 15.6, -Math.PI / 2);
+  sideTable(P, 3.4, 4.3); sideTable(P, 3.4, 14.2); floorLampModel(P, 12.4, 15, -Math.PI / 2);
   tallPlant(P, 1.6, 1.6, .9);
   pendant(P, 7.6, 9.25, 10.2, 7.2, 'cane');
   // reading nook in the corridor towards the box room
@@ -1408,7 +1421,7 @@ ROOMS.forEach(r => { const fn = GEN[r.type]; CUR_ROOM = r.id; if (fn) fn(r); });
 })();
 
 /* ---------- one draw call per material per group ---------- */
-['g', 'f', 's'].forEach(f => { mergeGroup(FG[f].walls); mergeGroup(FG[f].stuff); mergeGroup(FG[f].ceil); });
+['g', 'f', 's'].forEach(f => { mergeGroup(FG[f].walls); mergeGroup(FG[f].stuff, FOOT[f]); mergeGroup(FG[f].ceil); });
 mergeGroup(ROOF); mergeGroup(SITE);
 
 /* ---------- light ---------- */
@@ -1600,7 +1613,7 @@ const GATE = spot('g', 31, 72, ROOM.garden);
 const P3 = s => new T.Vector3(s.x, feetY(s.f) + EYE, s.z);
 function hopsFrom(s) { // where you can go from spot s: through each doorway of this room, or into the room's view point
   const out = [], rs = ROOM_SPOT[s.room];
-  if (rs && rs !== s) out.push({ to: rs, via: [], name: ROOM[s.room].name, kind: 'in' });
+  if (rs && rs !== s && rs !== s.base) out.push({ to: rs, via: [], name: ROOM[s.room].name, kind: 'in' });
   DOORS.forEach(d => [[d.a, d.b, 1], [d.b, d.a, -1]].forEach(([n, fr, dir]) => {
     if (n.room !== s.room) return;
     const via = (n === s ? [] : [P3(n)]).concat((dir > 0 ? d.via : [...d.via].reverse()).map(v => new T.Vector3(v[0], v[1] + EYE, v[2])));
@@ -1608,8 +1621,8 @@ function hopsFrom(s) { // where you can go from spot s: through each doorway of 
     out.push({ to: fr, via, name, kind: d.kind === 'stair' ? (dir > 0 ? 'up' : 'down') : 'door', d: Math.hypot(n.x - s.x, n.z - s.z) });
   }));
   const best = {}; // one hop per destination room: keep the nearest doorway
-  out.forEach(h => { const k = h.kind + h.to.room; if (!best[k] || (h.d || 0) < (best[k].d || 0)) best[k] = h; });
-  return Object.values(best).filter(h => h.to !== s);
+  out.filter(h => h.to !== s && hopPath(h, P3(s))).forEach(h => { const k = h.kind + h.to.room; if (!best[k] || (h.d || 0) < (best[k].d || 0)) best[k] = h; });
+  return Object.values(best);
 }
 
 const state = { mode: 'ext', floor: 's', room: null, ext: 'front', spot: null };
@@ -1631,16 +1644,83 @@ function goExt(key = 'front') { const v = EXT_VIEWS[key]; Object.assign(state, {
 function goFloor(f) { Object.assign(state, { mode: 'floor', floor: f, room: null, spot: null }); const lv = LEVEL[f]; flyTo(new T.Vector3(66, lv + 70, 108), new T.Vector3(30, lv, 36), .08); syncUI(); }
 function goRoom(id) {
   const r = ROOM[id], from = state.mode; Object.assign(state, { mode: 'room', floor: r.f, room: id });
-  const v = roomView(r); state.spot = ROOM_SPOT[id] || null; flyTo(v.pos, v.look, from === 'room' ? .45 : .04); syncUI();
+  const v = roomView(r), sp = ROOM_SPOT[id] && clearSpot(ROOM_SPOT[id]); state.spot = sp || null; if (sp) v.pos.set(sp.x, v.pos.y, sp.z);
+  flyTo(v.pos, v.look, from === 'room' ? .45 : .04); syncUI();
 }
-function walkIn() { stopTour(); Object.assign(state, { mode: 'room', floor: 'g', room: 'garden', spot: GATE }); flyTo(P3(GATE), new T.Vector3(31, 4.5, 50), .06); syncUI(); }
+function walkIn() { stopTour(); const g = clearSpot(GATE); Object.assign(state, { mode: 'room', floor: 'g', room: 'garden', spot: g }); flyTo(P3(g), new T.Vector3(31, 4.5, 50), .06); syncUI(); }
+/* route around furniture inside a room: coarse occupancy grid of everything standing on the floor, A*, then string-pulled */
+const NAV = {}, _nb = new T.Box3();
+function navGrid(r) {
+  if (NAV[r.id] && NAV[r.id].ver === modelsPending) return NAV[r.id]; // rebuilt once the furniture models have loaded
+  const c = .6, m = WT / 2 + .9, x0 = r.x0 + m, z0 = r.z0 + m, nx = Math.max(1, Math.round((r.x1 - m - x0) / c) + 1), nz = Math.max(1, Math.round((r.z1 - m - z0) / c) + 1);
+  const occ = new Uint8Array(nx * nz), lv = feetY(r.f), pad = .9;
+  const boxes = FOOT[r.f].slice(); // merged furniture, plus the loaded models and anything kept unmerged
+  FG[r.f].stuff.updateMatrixWorld(true);
+  FG[r.f].stuff.traverse(o => { if (!o.isMesh || !o.geometry || o.userData.merged) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); boxes.push(_nb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld).clone()); });
+  boxes.forEach(_nb => {
+    if (_nb.max.y < lv + .4 || _nb.min.y > lv + 4.5) return; // rugs and shadows, or things hung overhead
+    if (_nb.max.x < r.x0 || _nb.min.x > r.x1 || _nb.max.z < r.z0 || _nb.min.z > r.z1) return;
+    if (_nb.max.x - _nb.min.x > 30 || _nb.max.z - _nb.min.z > 30) return; // slabs and other whole-floor pieces
+    const pd = _nb.min.y > lv + 1.2 ? .4 : pad; // plant canopies and wall-hung pieces need less room than things on the floor
+    for (let i = Math.max(0, Math.ceil((_nb.min.x - pd - x0) / c)); i <= Math.min(nx - 1, Math.floor((_nb.max.x + pd - x0) / c)); i++)
+      for (let j = Math.max(0, Math.ceil((_nb.min.z - pd - z0) / c)); j <= Math.min(nz - 1, Math.floor((_nb.max.z + pd - z0) / c)); j++) occ[j * nx + i] = 1;
+  });
+  return (NAV[r.id] = { c, x0, z0, nx, nz, occ, ver: modelsPending });
+}
+function route(r, ax, az, bx, bz) {
+  const { c, x0, z0, nx, nz, occ } = navGrid(r), N = nx * nz;
+  const free = (i, j) => i >= 0 && j >= 0 && i < nx && j < nz && !occ[j * nx + i];
+  const cell = (x, z) => [Math.max(0, Math.min(nx - 1, Math.round((x - x0) / c))), Math.max(0, Math.min(nz - 1, Math.round((z - z0) / c)))];
+  const nearFree = ([i, j]) => { if (free(i, j)) return [i, j];
+    for (let d = 1; d < 14; d++) for (let a = -d; a <= d; a++) for (let b = -d; b <= d; b++) if (Math.max(Math.abs(a), Math.abs(b)) === d && free(i + a, j + b)) return [i + a, j + b];
+    return null; };
+  const s = nearFree(cell(ax, az)), g = nearFree(cell(bx, bz)); if (!s || !g) return null;
+  const sk = s[1] * nx + s[0], gk = g[1] * nx + g[0], cost = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), done = new Uint8Array(N), open = [sk];
+  const est = k => cost[k] + Math.hypot(k % nx - g[0], Math.floor(k / nx) - g[1]); cost[sk] = 0;
+  while (open.length) {
+    let bi = 0; for (let q = 1; q < open.length; q++) if (est(open[q]) < est(open[bi])) bi = q;
+    const k = open.splice(bi, 1)[0]; if (k === gk) break; if (done[k]) continue; done[k] = 1;
+    const i = k % nx, j = (k - i) / nx;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      if ((!a && !b) || !free(i + a, j + b) || (a && b && (!free(i + a, j) || !free(i, j + b)))) continue;
+      const nk = (j + b) * nx + i + a, nc = cost[k] + (a && b ? 1.414 : 1); if (nc < cost[nk]) { cost[nk] = nc; from[nk] = k; open.push(nk); }
+    }
+  }
+  if (gk !== sk && from[gk] < 0) return null;
+  const path = []; for (let k = gk; k >= 0; k = k === sk ? -1 : from[k]) path.unshift([k % nx, Math.floor(k / nx)]);
+  const see = (p, q) => { const n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) * 2); for (let t = 0; t <= n; t++) { if (!free(Math.round(p[0] + (q[0] - p[0]) * t / n), Math.round(p[1] + (q[1] - p[1]) * t / n))) return false; } return true; };
+  const keep = [path[0]]; for (let i = 0; i < path.length - 1;) { let k = path.length - 1; while (k > i + 1 && !see(path[i], path[k])) k--; keep.push(path[k]); i = k; }
+  const xz = ([i, j]) => [x0 + i * c, z0 + j * c], end = xz(g), start = xz(s);
+  const pts = keep.slice(1, -1).map(xz); if (Math.hypot(start[0] - ax, start[1] - az) > .8) pts.unshift(start);
+  return { pts, end: Math.hypot(end[0] - bx, end[1] - bz) > .8 ? end : null, blockedStart: Math.hypot(start[0] - ax, start[1] - az) > .8 };
+}
+function clearSpot(s) { // nearest spot not standing in furniture (some room viewpoints sit in a plant's canopy)
+  const r = ROOM[s.room]; if (!r || r.type === 'stair') return s;
+  const rt = route(r, s.x, s.z, s.x, s.z); return rt && rt.end ? { ...s, x: rt.end[0], z: rt.end[1], base: s } : s;
+}
+const floorOf = p => p.y - EYE > 18 ? 's' : p.y - EYE > 6 ? 'f' : 'g';
+function hopPath(h, start) { // the hop's waypoints, with each leg inside a room routed around the furniture
+  const raw = [start, ...h.via, P3(h.to)], pts = [start]; let to = h.to;
+  for (let i = 1; i < raw.length; i++) {
+    const a = raw[i - 1]; let b = raw[i];
+    const ra = roomAt(floorOf(a), a.x, a.z), rb = roomAt(floorOf(b), b.x, b.z);
+    if (ra && ra === rb && ra.type !== 'stair' && Math.abs(a.y - b.y) < .5) {
+      const rt = route(ra, a.x, a.z, b.x, b.z);
+      if (!rt || (rt.end && i < raw.length - 1)) return null; // no way round, or furniture stands in front of the doorway
+      rt.pts.forEach(([x, z]) => pts.push(new T.Vector3(x, a.y, z))); if (rt.end) { b = new T.Vector3(rt.end[0], b.y, rt.end[1]); to = { ...to, x: b.x, z: b.z }; }
+    }
+    pts.push(b);
+  }
+  return { pts: pts.filter((p, i, a) => i === 0 || p.distanceTo(a[i - 1]) > .3), to };
+}
 let hop = null, HOPS = [];
 function goHop(h, keepYaw) {
   if (!h || fly || hop) return; stopTour();
-  const pts = [camera.position.clone(), ...h.via, P3(h.to)], seg = [];
-  let len = 0; for (let i = 1; i < pts.length; i++) { const l = pts[i].distanceTo(pts[i - 1]); seg.push(l); len += l; }
+  const { pts, to } = hopPath(h, camera.position.clone());
+  if (pts.length < 2) return;
+  const curve = new T.CatmullRomCurve3(pts, false, 'catmullrom', .25), len = curve.getLength(); // rounded corners through doorways
   const stair = h.kind === 'up' || h.kind === 'down';
-  hop = { h, pts, seg, len, t: 0, dur: Math.max(.45, len / (stair ? 9 : 11)), keepYaw, floors: [state.floor, h.to.f] };
+  hop = { h, to, curve, len, t: 0, dur: Math.max(.9, len / (stair ? 8 : 7)), keepYaw, floors: [state.floor, h.to.f] };
 }
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 function hopDir(h) { // heading of the first leg of a hop
@@ -1687,7 +1767,7 @@ function syncUI() {
   if (state.mode === 'room' && lastMode !== 'room' && PHONE.matches) $('#panel').classList.add('min');
   if (state.mode !== 'room') $('#panel').classList.remove('min');
   lastMode = state.mode; syncGrip();
-  $('#hint').textContent = state.mode === 'room' ? 'Drag to look around · tap an arrow or the floor to walk · W / S to step · Esc to go back'
+  $('#hint').textContent = state.mode === 'room' ? 'Drag to look around · tap a place name to walk there · Esc to go back'
     : state.mode === 'floor' ? 'Click a room to step inside · drag to orbit · scroll to zoom' : 'Drag to orbit · scroll to zoom · pick a floor or room';
   $('#walkpad').style.visibility = state.mode === 'room' ? 'visible' : 'hidden';
 }
@@ -1715,7 +1795,7 @@ canvas.addEventListener('pointermove', e => {
 canvas.addEventListener('pointerup', e => { if (drag && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) pick(e); drag = null; });
 let fovZoom = 1; // scroll zooms the view while walking, like Street View
 canvas.addEventListener('wheel', e => { stopTour(); if (state.mode === 'room' && !fly) { e.preventDefault(); fovZoom = Math.max(.45, Math.min(1, fovZoom * (1 + e.deltaY * .001))); } }, { passive: false });
-function step(dir) { if (state.mode !== 'room') return; stopTour(); goHop(dir > 0 ? hopToward(yaw) : hopToward(yaw + Math.PI), dir < 0); }
+function step(dir) { if (state.mode !== 'room') return; stopTour(); goHop(dir > 0 ? hopToward(yaw, .7) : hopToward(yaw + Math.PI, .7), dir < 0); } // only the hotspot you're facing
 addEventListener('keydown', e => {
   if (e.key === 'Escape') { goBack(); return; } keys[e.key.toLowerCase()] = true; if (state.mode === 'room' && e.key.startsWith('Arrow')) e.preventDefault();
   if (state.mode === 'room' && !e.repeat) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') step(1); if (k === 's' || k === 'arrowdown') step(-1); }
@@ -1727,7 +1807,7 @@ function pick(e) {
   if (fly || (state.mode !== 'floor' && state.mode !== 'room')) return;
   const rect = canvas.getBoundingClientRect(); ndc.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  if (state.mode === 'room') { const d = ray.ray.direction; goHop(hopToward(Math.atan2(-d.x, -d.z), .6)); return; } // tap: walk the way you tapped
+  if (state.mode === 'room') return; // while walking you move by tapping a hotspot, not the floor
   const hits = ray.intersectObjects(floorPick.filter(m => ROOM[m.userData.room]?.f === state.floor), false);
   if (hits.length) { let r = ROOM[hits[0].object.userData.room]; if (r && r.list) goRoom(r.id); }
 }
@@ -1769,11 +1849,10 @@ function loop() {
     }
   } else if (state.mode === 'room') {
     if (hop) { // glide along the hop's path, turning to face the way you walk (unless stepping back)
-      hop.t = Math.min(1, hop.t + rdt / hop.dur); let d = smoother(hop.t) * hop.len, i = 0;
-      while (i < hop.seg.length - 1 && d > hop.seg[i]) { d -= hop.seg[i]; i++; }
-      const a = hop.pts[i], b = hop.pts[i + 1]; camera.position.lerpVectors(a, b, hop.seg[i] ? Math.min(1, d / hop.seg[i]) : 1);
-      if (!hop.keepYaw && Math.hypot(b.x - a.x, b.z - a.z) > .5) { const ty = Math.atan2(-(b.x - a.x), -(b.z - a.z)); yaw += Math.atan2(Math.sin(ty - yaw), Math.cos(ty - yaw)) * Math.min(1, rdt * 5); }
-      if (hop.t >= 1) { const to = hop.h.to; hop = null; Object.assign(state, { spot: to, room: to.room, floor: to.f }); syncUI(); refreshHops(); }
+      hop.t = Math.min(1, hop.t + rdt / hop.dur); const u = smoother(hop.t);
+      hop.curve.getPointAt(u, camera.position);
+      if (!hop.keepYaw) { const tg = hop.curve.getTangentAt(Math.min(.999, u + .04), tmp); if (Math.hypot(tg.x, tg.z) > .2) { const ty = Math.atan2(-tg.x, -tg.z); yaw += Math.atan2(Math.sin(ty - yaw), Math.cos(ty - yaw)) * Math.min(1, rdt * 3.5); } }
+      if (hop.t >= 1) { const to = hop.to; hop = null; Object.assign(state, { spot: to, room: to.room, floor: to.f }); syncUI(); refreshHops(); }
     }
     if (keys['arrowleft'] || keys['a']) yawV += dt * 1.4; if (keys['arrowright'] || keys['d']) yawV -= dt * 1.4;
     yaw += yawV * k * 1.6; pitch = Math.max(-1.1, Math.min(1.1, pitch + pitchV * k * 1.6)); yawV *= (1 - k); pitchV *= (1 - k);
