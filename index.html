@@ -19,6 +19,7 @@
   --bg:#121514; --panel:rgba(22,26,24,.9); --ink:#ebeeea; --muted:#9aa49e; --line:rgba(255,255,255,.1);
   --accent:#d39a68; --accent-ink:#1b130d; --chip:#252a27; --chip-on:#ebeeea; --chip-on-ink:#151816; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark }
 html,body{height:100%}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);overflow:hidden}
 #app{position:fixed;inset:0}
 #c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;outline:none}
@@ -47,10 +48,14 @@ h1{margin:0;font:700 25px/1.05 var(--f-display);letter-spacing:-.01em;text-wrap:
 .btn{appearance:none;border:0;background:var(--accent);color:var(--accent-ink);font:600 14px/1 var(--f-body);padding:12px 14px;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
 .btn.ghost{background:var(--chip);color:var(--ink)}
 .note{margin:0;font-size:11.5px;line-height:1.45;color:var(--muted)}
+.ph,.tabs,.pf{flex-shrink:0}
+.ph{position:relative}
+.grip{display:none;position:absolute;right:12px;top:10px;appearance:none;border:0;background:var(--chip);color:var(--ink);font:600 12px/1 var(--f-body);padding:9px 12px;border-radius:999px;cursor:pointer}
+.lbl.hot{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-size:13px;padding:8px 12px}
 #hud{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:8px;align-items:center;
   background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 16px;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
 #hint{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#hud .btn{padding:9px 14px;border-radius:999px;font-size:13px}
+#hud .btn{padding:9px 14px;border-radius:999px;font-size:13px;white-space:nowrap}
 #walkpad{display:none;gap:6px}
 #walkpad .btn{width:40px;padding:9px 0}
 #roomcard{position:absolute;right:16px;top:calc(16px + env(safe-area-inset-top,0px));background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);display:grid;gap:4px;max-width:260px}
@@ -63,7 +68,13 @@ h1{margin:0;font:700 25px/1.05 var(--f-display);letter-spacing:-.01em;text-wrap:
 @media (max-width:700px){
   #panel{left:0;right:0;top:auto;bottom:0;width:auto;max-height:38%;border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
   .ph{padding:12px 16px 8px} h1{font-size:20px} .ph .meta{display:none}
-  .tabs{flex-wrap:nowrap;overflow-x:auto;padding:8px 16px 2px}
+  .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 12px 6px}
+  .tab{padding:12px 0;min-height:42px;text-align:center;font-size:14px}
+  .grip{display:block}
+  #panel.min .rooms,#panel.min .pf{display:none}
+  #panel.min{max-height:none}
+  .lbl.hot{font-size:14px;padding:11px 14px}
+  .pf{grid-template-columns:1fr 1fr;gap:8px} .pf .btn{padding:11px 8px;font-size:13px}
   .note{display:none} .pf{padding:8px 16px 10px}
   #hud{top:calc(12px + env(safe-area-inset-top,0px));bottom:auto}
   #hint{display:none}
@@ -80,6 +91,7 @@ h1{margin:0;font:700 25px/1.05 var(--f-display);letter-spacing:-.01em;text-wrap:
     <div class="ph">
       <div class="eyebrow">Shrivastava residence</div>
       <h1>Walk through the house</h1>
+      <button class="grip" id="grip" type="button" aria-expanded="true">Hide ▾</button>
       <div class="meta">Plot 60′ × 75′ · G + 2 · slab 12′-6″ / 12′-0″</div>
     </div>
     <div class="tabs" role="group" aria-label="Floors">
@@ -90,7 +102,8 @@ h1{margin:0;font:700 25px/1.05 var(--f-display);letter-spacing:-.01em;text-wrap:
     </div>
     <ul class="rooms" id="rooms"></ul>
     <div class="pf">
-      <button class="btn" id="tour">▶ Play guided tour</button>
+      <button class="btn" id="walkin">Walk in from the gate</button>
+      <button class="btn ghost" id="tour">▶ Play guided tour</button>
       <p class="note">Rooms traced from the architect's floor plans. Furniture and finishes are indicative, styled after the renders, not the final interior design.</p>
       <p class="note">Sofas, chairs, pouf, lamp, flowers and plants: glTF sample models by Wayfair, DGG and Khronos (CC BY 4.0).</p>
     </div>
@@ -531,6 +544,7 @@ rm('tS2', 's', 'Servant toilet', 33.3, 7, 40, 14, 'toilet', { list: false });
 rm('liftS', 's', 'Lift', 33.3, 14, 40, 20.5, 'lift', { list: false });
 rm('servArea', 's', 'Servant area', 40, 7, 55, 13, 'outdoor', { dim: `14'8" wide`, list: false });
 rm('terrace', 's', 'Terrace & pergola', 0, 44, 60, 65, 'terrace', { dim: `59'4" × 21'2"`, nofloor: true, walls: false });
+rm('roofS', 's', 'Terrace', 26.8, 25.5, 60, 44, 'terrace', { list: false, nofloor: true, walls: false });
 
 const ROOM = Object.fromEntries(ROOMS.map(r => [r.id, r]));
 
@@ -753,6 +767,14 @@ function frame(r, wall) {
   if (wall === 'E') { rot = -Math.PI / 2; [W, D] = [D, W]; }
   const g = G(FG[r.f].stuff, cx, LEVEL[r.f] + (r.f === 'g' ? .06 : 0), cz, rot);
   return { g, W, D, back: -D / 2 + WT / 2, front: D / 2 - WT / 2, L: -W / 2 + WT / 2, R: W / 2 - WT / 2 };
+}
+// true when a point in group g's local coords keeps a doorway clear (nothing within ~3.6ft in front of any door)
+const _dv = new T.Vector3();
+function doorClear(g, x, z, rad = 1.2) {
+  const f = CUR_ROOM ? ROOM[CUR_ROOM].f : 'g'; g.updateWorldMatrix(true, false); const w = g.localToWorld(_dv.set(x, 0, z));
+  return !OPEN[f].some(o => o[4] !== 'win' && (o[0] === 'x'
+    ? Math.abs(w.x - o[1]) < 3.6 + rad && w.z > o[2] - rad && w.z < o[3] + rad
+    : Math.abs(w.z - o[1]) < 3.6 + rad && w.x > o[2] - rad && w.x < o[3] + rad));
 }
 function at(r) { return G(FG[r.f].stuff, r.x0, LEVEL[r.f] + (r.f === 'g' ? .06 : 0), r.z0); }
 function aim(x, z, tx, tz) { return Math.atan2(tx - x, tz - z); } // chairs face +z, so point them at a target
@@ -991,11 +1013,11 @@ function bedroom(r) {
     B(g, M.walnut, 6.4, .75, 1.4, 0, 1.4, front - .95); B(g, M.ledStrip, 6.2, .04, .05, 0, 1.38, front - .4, { cast: false });
     vase(g, -2.4, 2.15, front - .9, .5); bookStack(g, 2.2, 2.15, front - .9, 2);
     const s = (W - 7.8) / 2 - .4;
-    if (s > 2.2) [-1, 1].forEach(sg => wardrobe(g, s, sg * (3.8 + s / 2 + .1), front - 1.05));
+    if (s > 2.2) [-1, 1].forEach(sg => { const wx = sg * (3.8 + s / 2 + .1); if (doorClear(g, wx, front - 1.05, s / 2)) wardrobe(g, s, wx, front - 1.05); });
   }
   if (r.id === 'bed3') { pouf(g, bx - 3.9, bz + 4.6, .9); armchair(g, L + 2, front - 3, aim(L + 2, front - 3, 0, 0), M.velvetOlive); floorLamp(g, L + 1, front - 1.2, Math.PI / 2); }
-  else if (W > 14) { armchair(g, R - 1.9, front - (D > 13 ? 4.5 : 2), aim(R - 1.9, front - (D > 13 ? 4.5 : 2), bx, bz + 1.5), M.velvetOlive); floorLamp(g, R - .8, front - (D > 13 ? 6.5 : 4), Math.PI); }
-  if (W > 15 && r.id !== 'bed3') tallPlant(g, L + 1.3, front - 1.6, .8);
+  else if (W > 14 && doorClear(g, R - 1.9, front - (D > 13 ? 4.5 : 2), 1.5)) { armchair(g, R - 1.9, front - (D > 13 ? 4.5 : 2), aim(R - 1.9, front - (D > 13 ? 4.5 : 2), bx, bz + 1.5), M.velvetOlive); floorLamp(g, R - .8, front - (D > 13 ? 6.5 : 4), Math.PI); }
+  if (W > 15 && r.id !== 'bed3' && doorClear(g, L + 1.3, front - 1.6)) tallPlant(g, L + 1.3, front - 1.6, .8);
   if (r.id === 'bed3') { // study corner on the wall away from the bathroom doors
     B(g, M.walnut, 2.1, .15, 4.6, R - 1.1, 2.5, bz + 2.6); B(g, M.walnut, 2, 2.5, .15, R - 1.1, 0, bz + .4); B(g, M.walnut, 2, 2.5, .15, R - 1.1, 0, bz + 4.8);
     B(g, M.oak, .1, 2.6, 4.4, R - .1, 4.6, bz + 2.6); for (let i = 0; i < 3; i++) B(g, M.oak, 1, .08, 4.4, R - .55, 4.9 + i * .9, bz + 2.6);
@@ -1527,7 +1549,7 @@ const VIEWS = { // [x, height above floor, z]
   terrace: { pos: [44, 6, 63], look: [8, 6, 50] }, sitG: { pos: [57, 5.4, 40], look: [57, 3, 26] },
   balF: { pos: [27, 5.4, 1.2], look: [12, 3, 4] }, balR: { pos: [57, 5.4, 24.5], look: [57, 3, 10] },
   lob2: { pos: [38.8, 5.4, 53], look: [27, 4, 46] }, verandah: { pos: [35, 5.4, 64.4], look: [29, 4, 55] },
-  box: { pos: [16, 5.4, 34.5], look: [6, 3, 27] },
+  box: { pos: [16, 5.4, 34.5], look: [6, 3, 27] }, roofS: { pos: [40, 6, 36], look: [30, 5, 60] },
   mbG: { pos: [27, 5.5, 24], look: [13.5, 3.8, 12.8] }, bed3: { pos: [25.2, 5.5, 63], look: [11.5, 3.8, 49] }, family: { pos: [28.5, 5.6, 34.5], look: [10, 3, 29.5] }, storeS: { pos: [13.8, 5.4, 19.4], look: [3, 3, 3] },
 };
 function roomView(r) {
@@ -1545,7 +1567,52 @@ function roomView(r) {
   return { pos: new T.Vector3(r.x1 - 1.4, lv + 5.4, r.z1 - 1.4), look: new T.Vector3(r.x0 + (r.x1 - r.x0) * .3, lv + 3, r.z0 + (r.z1 - r.z0) * .3) };
 }
 
-const state = { mode: 'ext', floor: 's', room: null, ext: 'front' };
+/* ---------- walking: Street View-style hops between spots (each room's view point, both sides of every doorway, stair flights) ---------- */
+const EYE = 5.4, SPOTS = [], DOORS = [], ROOM_SPOT = {};
+const feetY = f => LEVEL[f] + (f === 'g' ? .06 : 0);
+const OPEN_AIR = r => OUTDOOR.has(r.type) || r.o.walls === false;
+function roomAt(f, x, z) { return ROOMS.find(r => r.f === f && x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1 && !['void', 'lift'].includes(r.type)); }
+function spot(f, x, z, room) { const s = { i: SPOTS.length, f, x, z, room: room.id }; SPOTS.push(s); return s; }
+function door(a, b, via = [], kind = 'door') { DOORS.push({ a, b, via, kind }); }
+ROOMS.forEach(r => { if (!['void', 'lift', 'stair'].includes(r.type)) { const v = roomView(r); ROOM_SPOT[r.id] = spot(r.f, v.pos.x, v.pos.z, r); } });
+const GATE = spot('g', 31, 72, ROOM.garden);
+['g', 'f', 's'].forEach(f => {
+  const pass = (ax, c, m) => { // a spot 1.8ft each side of a wall line
+    const p0 = ax === 'x' ? [c - 1.8, m] : [m, c - 1.8], p1 = ax === 'x' ? [c + 1.8, m] : [m, c + 1.8], r0 = roomAt(f, ...p0), r1 = roomAt(f, ...p1);
+    if (r0 && r1 && r0 !== r1) door(spot(f, ...p0, r0), spot(f, ...p1, r1));
+  };
+  OPEN[f].forEach(o => { if (o[4] !== 'win') pass(o[0], o[1], (o[2] + o[3]) / 2); });
+  // open-air rooms have no walls between them: link them where they share an edge
+  const oa = ROOMS.filter(r => r.f === f && OPEN_AIR(r));
+  oa.forEach((a, i) => oa.slice(i + 1).forEach(b => {
+    const ov = (lo0, hi0, lo1, hi1) => [Math.max(lo0, lo1), Math.min(hi0, hi1)];
+    [['x', a.x1, b.x0], ['x', a.x0, b.x1]].forEach(([ax, c, d]) => { if (Math.abs(c - d) > .1) return; const [l, h] = ov(a.z0, a.z1, b.z0, b.z1); if (h - l > 3) pass(ax, c, (l + h) / 2); });
+    [['z', a.z1, b.z0], ['z', a.z0, b.z1]].forEach(([ax, c, d]) => { if (Math.abs(c - d) > .1) return; const [l, h] = ov(a.x0, a.x1, b.x0, b.x1); if (h - l > 3) pass(ax, c, (l + h) / 2); });
+  }));
+});
+[['g', 'f'], ['f', 's']].forEach(([lo, hi]) => { // dog-leg stair: flight west along the south half, landing, flight east along the north half
+  const r = ROOMS.find(q => q.f === lo && q.type === 'stair'), lv = feetY(lo), mid = (r.z0 + r.z1) / 2, tr = .95, xs = r.x1 - 1.6;
+  const zS = (mid + r.z1 - WT / 2) / 2, zN = (r.z0 + WT / 2 + mid) / 2, lx1 = xs - 15 * tr, lx0 = r.x0 + WT / 2, top = lx1 + 9 * tr;
+  const up = roomAt(hi, top + .9, zN);
+  door(spot(lo, xs + .9, zS, r), spot(hi, top + .9, zN, up),
+    [[xs, lv, zS], [lx1, lv + 7.5, zS], [(lx0 + lx1) / 2 + .4, lv + 7.5, mid], [lx1, lv + 7.5, zN], [top, LEVEL[hi], zN]], 'stair');
+});
+const P3 = s => new T.Vector3(s.x, feetY(s.f) + EYE, s.z);
+function hopsFrom(s) { // where you can go from spot s: through each doorway of this room, or into the room's view point
+  const out = [], rs = ROOM_SPOT[s.room];
+  if (rs && rs !== s) out.push({ to: rs, via: [], name: ROOM[s.room].name, kind: 'in' });
+  DOORS.forEach(d => [[d.a, d.b, 1], [d.b, d.a, -1]].forEach(([n, fr, dir]) => {
+    if (n.room !== s.room) return;
+    const via = (n === s ? [] : [P3(n)]).concat((dir > 0 ? d.via : [...d.via].reverse()).map(v => new T.Vector3(v[0], v[1] + EYE, v[2])));
+    const name = d.kind === 'stair' ? (dir > 0 ? 'Upstairs' : 'Downstairs') : ROOM[fr.room].name;
+    out.push({ to: fr, via, name, kind: d.kind === 'stair' ? (dir > 0 ? 'up' : 'down') : 'door', d: Math.hypot(n.x - s.x, n.z - s.z) });
+  }));
+  const best = {}; // one hop per destination room: keep the nearest doorway
+  out.forEach(h => { const k = h.kind + h.to.room; if (!best[k] || (h.d || 0) < (best[k].d || 0)) best[k] = h; });
+  return Object.values(best).filter(h => h.to !== s);
+}
+
+const state = { mode: 'ext', floor: 's', room: null, ext: 'front', spot: null };
 let fly = null, yaw = 0, pitch = 0, clipY = 400;
 const smoother = t => t * t * t * (t * (t * 6 - 15) + 10);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1560,12 +1627,27 @@ function flyTo(pos, look, arc = .2, dur) {
 }
 function bez(a, c, b, t, out) { const u = 1 - t; return out.set(u * u * a.x + 2 * u * t * c.x + t * t * b.x, u * u * a.y + 2 * u * t * c.y + t * t * b.y, u * u * a.z + 2 * u * t * c.z + t * t * b.z); }
 
-function goExt(key = 'front') { const v = EXT_VIEWS[key]; Object.assign(state, { mode: 'ext', floor: 's', room: null, ext: key }); flyTo(new T.Vector3(...v.pos), new T.Vector3(...v.look), .12); syncUI(); }
-function goFloor(f) { Object.assign(state, { mode: 'floor', floor: f, room: null }); const lv = LEVEL[f]; flyTo(new T.Vector3(66, lv + 70, 108), new T.Vector3(30, lv, 36), .08); syncUI(); }
+function goExt(key = 'front') { const v = EXT_VIEWS[key]; Object.assign(state, { mode: 'ext', floor: 's', room: null, ext: key, spot: null }); flyTo(new T.Vector3(...v.pos), new T.Vector3(...v.look), .12); syncUI(); }
+function goFloor(f) { Object.assign(state, { mode: 'floor', floor: f, room: null, spot: null }); const lv = LEVEL[f]; flyTo(new T.Vector3(66, lv + 70, 108), new T.Vector3(30, lv, 36), .08); syncUI(); }
 function goRoom(id) {
   const r = ROOM[id], from = state.mode; Object.assign(state, { mode: 'room', floor: r.f, room: id });
-  const v = roomView(r); flyTo(v.pos, v.look, from === 'room' ? .45 : .04); syncUI();
+  const v = roomView(r); state.spot = ROOM_SPOT[id] || null; flyTo(v.pos, v.look, from === 'room' ? .45 : .04); syncUI();
 }
+function walkIn() { stopTour(); Object.assign(state, { mode: 'room', floor: 'g', room: 'garden', spot: GATE }); flyTo(P3(GATE), new T.Vector3(31, 4.5, 50), .06); syncUI(); }
+let hop = null, HOPS = [];
+function goHop(h, keepYaw) {
+  if (!h || fly || hop) return; stopTour();
+  const pts = [camera.position.clone(), ...h.via, P3(h.to)], seg = [];
+  let len = 0; for (let i = 1; i < pts.length; i++) { const l = pts[i].distanceTo(pts[i - 1]); seg.push(l); len += l; }
+  const stair = h.kind === 'up' || h.kind === 'down';
+  hop = { h, pts, seg, len, t: 0, dur: Math.max(.45, len / (stair ? 9 : 11)), keepYaw, floors: [state.floor, h.to.f] };
+}
+const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+function hopDir(h) { // heading of the first leg of a hop
+  const c = camera.position, p = [...h.via, P3(h.to)].find(q => Math.hypot(q.x - c.x, q.z - c.z) > 1) || P3(h.to);
+  return Math.atan2(-(p.x - c.x), -(p.z - c.z));
+}
+function hopToward(yw, maxA = 1.2) { let best = null, ba = maxA; HOPS.forEach(h => { const a = angDiff(hopDir(h), yw); if (a < ba) { ba = a; best = h; } }); return best; }
 function goBack() { stopTour(); if (state.mode === 'room') goFloor(state.floor); else if (state.mode === 'floor') goExt(state.ext); }
 
 /* ---------- UI ---------- */
@@ -1590,6 +1672,8 @@ const labels = ROOMS.filter(r => r.list).map(r => {
   const p = r.id === 'terrace' ? new T.Vector3(12, 25, 52) : r.id === 'living' ? new T.Vector3(30, 1.5, 33) : new T.Vector3((r.x0 + r.x1) / 2, LEVEL[r.f] + 1.5, (r.z0 + r.z1) / 2);
   return { r, el, p };
 });
+const PHONE = matchMedia('(max-width:700px)'); let lastMode = null;
+function syncGrip() { const min = $('#panel').classList.contains('min'); $('#grip').setAttribute('aria-expanded', String(!min)); $('#grip').textContent = min ? 'Rooms ▴' : 'Hide ▾'; }
 function syncUI() {
   listFor = state.mode === 'ext' ? 'ext' : state.floor;
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-pressed', String(t.dataset.v === listFor)));
@@ -1600,15 +1684,28 @@ function syncUI() {
   if (state.mode === 'room') { const r = ROOM[state.room]; rc.hidden = false; $('#rc-name').textContent = r.name; $('#rc-dim').textContent = [FLOOR_NAMES[r.f], r.o.dim].filter(Boolean).join(' · '); }
   else if (state.mode === 'floor') { rc.hidden = false; $('#rc-name').textContent = FLOOR_NAMES[state.floor]; $('#rc-dim').textContent = 'Tap a room to step inside'; }
   else rc.hidden = true;
-  $('#hint').textContent = state.mode === 'room' ? 'Drag to look around · scroll or W A S D to walk · Esc to go back'
+  if (state.mode === 'room' && lastMode !== 'room' && PHONE.matches) $('#panel').classList.add('min');
+  if (state.mode !== 'room') $('#panel').classList.remove('min');
+  lastMode = state.mode; syncGrip();
+  $('#hint').textContent = state.mode === 'room' ? 'Drag to look around · tap an arrow or the floor to walk · W / S to step · Esc to go back'
     : state.mode === 'floor' ? 'Click a room to step inside · drag to orbit · scroll to zoom' : 'Drag to orbit · scroll to zoom · pick a floor or room';
   $('#walkpad').style.visibility = state.mode === 'room' ? 'visible' : 'hidden';
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { stopTour(); const v = t.dataset.v; v === 'ext' ? goExt('front') : goFloor(v); }));
 $('#back').addEventListener('click', goBack);
+$('#walkin').addEventListener('click', walkIn);
+$('#grip').addEventListener('click', () => { $('#panel').classList.toggle('min'); syncGrip(); });
+// hotspots: one floating button per place you can walk to from here
+const hotEls = [];
+function hotEl(i) {
+  if (!hotEls[i]) { const el = document.createElement('button'); el.type = 'button'; el.className = 'lbl hot'; el.hidden = true;
+    el.addEventListener('click', () => goHop(HOPS[i])); labelsEl.appendChild(el); hotEls[i] = el; }
+  return hotEls[i];
+}
+function refreshHops() { HOPS = state.mode === 'room' && state.spot ? hopsFrom(state.spot) : []; HOPS.forEach((h, i) => { hotEl(i).textContent = (h.kind === 'up' ? '↑ ' : h.kind === 'down' ? '↓ ' : h.kind === 'in' ? '• ' : '› ') + h.name; }); }
 
 /* ---------- input ---------- */
-let drag = null, padMove = 0, yawV = 0, pitchV = 0; const keys = {};
+let drag = null, yawV = 0, pitchV = 0; const keys = {};
 canvas.addEventListener('pointerdown', e => { stopTour(); drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY }; if (state.mode === 'room') canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', e => {
   if (!drag || state.mode !== 'room' || fly) return;
@@ -1616,23 +1713,23 @@ canvas.addEventListener('pointermove', e => {
   drag.x = e.clientX; drag.y = e.clientY;
 });
 canvas.addEventListener('pointerup', e => { if (drag && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) pick(e); drag = null; });
-let walkV = 0;
-canvas.addEventListener('wheel', e => { stopTour(); if (state.mode === 'room' && !fly) { e.preventDefault(); walkV += -e.deltaY * .012; } }, { passive: false });
-addEventListener('keydown', e => { if (e.key === 'Escape') { goBack(); return; } keys[e.key.toLowerCase()] = true; if (state.mode === 'room' && e.key.startsWith('Arrow')) e.preventDefault(); });
+let fovZoom = 1; // scroll zooms the view while walking, like Street View
+canvas.addEventListener('wheel', e => { stopTour(); if (state.mode === 'room' && !fly) { e.preventDefault(); fovZoom = Math.max(.45, Math.min(1, fovZoom * (1 + e.deltaY * .001))); } }, { passive: false });
+function step(dir) { if (state.mode !== 'room') return; stopTour(); goHop(dir > 0 ? hopToward(yaw) : hopToward(yaw + Math.PI), dir < 0); }
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { goBack(); return; } keys[e.key.toLowerCase()] = true; if (state.mode === 'room' && e.key.startsWith('Arrow')) e.preventDefault();
+  if (state.mode === 'room' && !e.repeat) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') step(1); if (k === 's' || k === 'arrowdown') step(-1); }
+});
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-const hold = (el, v) => { el.addEventListener('pointerdown', e => { e.preventDefault(); stopTour(); padMove = v; }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => el.addEventListener(t, () => padMove = 0)); };
-hold($('#fwd'), 1); hold($('#bwd'), -1);
+$('#fwd').addEventListener('click', () => step(1)); $('#bwd').addEventListener('click', () => step(-1));
 const ray = new T.Raycaster(), ndc = new T.Vector2();
 function pick(e) {
-  if (state.mode !== 'floor' || fly) return;
+  if (fly || (state.mode !== 'floor' && state.mode !== 'room')) return;
   const rect = canvas.getBoundingClientRect(); ndc.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
   ray.setFromCamera(ndc, camera);
+  if (state.mode === 'room') { const d = ray.ray.direction; goHop(hopToward(Math.atan2(-d.x, -d.z), .6)); return; } // tap: walk the way you tapped
   const hits = ray.intersectObjects(floorPick.filter(m => ROOM[m.userData.room]?.f === state.floor), false);
   if (hits.length) { let r = ROOM[hits[0].object.userData.room]; if (r && r.list) goRoom(r.id); }
-}
-function walk(dist, side = 0) {
-  camera.position.x = Math.max(-4, Math.min(64, camera.position.x - Math.sin(yaw) * dist + Math.cos(yaw) * side));
-  camera.position.z = Math.max(-4, Math.min(80, camera.position.z - Math.cos(yaw) * dist - Math.sin(yaw) * side));
 }
 
 /* ---------- guided tour ---------- */
@@ -1649,7 +1746,12 @@ function stopTour() { if (!tour) return; tour = null; $('#tour').textContent = '
 $('#tour').addEventListener('click', () => tour ? stopTour() : startTour());
 
 /* ---------- loop ---------- */
-function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = viewFov(); camera.updateProjectionMatrix(); }
+function viewFov() { // portrait phones get a wider vertical field so rooms don't look zoomed in
+  let v = 50; const a = camera.aspect;
+  if (a < 1.1) { const h = (state.mode === 'room' ? 80 : 62) * Math.PI / 180; v = Math.min(92, Math.max(50, 2 * Math.atan(Math.tan(h / 2) / a) * 180 / Math.PI)); }
+  return state.mode === 'room' ? v * fovZoom : v;
+}
 addEventListener('resize', resize); resize();
 camera.position.set(150, 95, 290); camera.lookAt(30, 15, 40); controls.target.set(30, 15, 40);
 let lastT = performance.now(); const clock = new T.Clock(), tmp = new T.Vector3(), eul = new T.Euler(0, 0, 0, 'YXZ');
@@ -1662,32 +1764,37 @@ function loop() {
     bez(fly.p0, fly.c, fly.p1, e, camera.position); camera.quaternion.slerpQuaternions(fly.q0, fly.q1, e);
     if (fly.t >= 1) {
       const look = fly.look; fly = null;
-      if (state.mode === 'room') { eul.setFromQuaternion(camera.quaternion, 'YXZ'); yaw = eul.y; pitch = -eul.x; yawV = pitchV = walkV = 0; }
+      if (state.mode === 'room') { eul.setFromQuaternion(camera.quaternion, 'YXZ'); yaw = eul.y; pitch = -eul.x; yawV = pitchV = 0; refreshHops(); }
       else { controls.target.copy(look); controls.enabled = true; controls.update(); }
     }
   } else if (state.mode === 'room') {
-    let f = padMove, sd = 0;
-    if (keys['w'] || keys['arrowup']) f += 1; if (keys['s'] || keys['arrowdown']) f -= 1;
-    if (keys['a']) sd -= 1; if (keys['d']) sd += 1;
-    if (keys['arrowleft']) yawV += dt * 1.4; if (keys['arrowright']) yawV -= dt * 1.4;
-    walk(f * dt * 8 + walkV * k, sd * dt * 6); walkV *= (1 - k);
+    if (hop) { // glide along the hop's path, turning to face the way you walk (unless stepping back)
+      hop.t = Math.min(1, hop.t + rdt / hop.dur); let d = smoother(hop.t) * hop.len, i = 0;
+      while (i < hop.seg.length - 1 && d > hop.seg[i]) { d -= hop.seg[i]; i++; }
+      const a = hop.pts[i], b = hop.pts[i + 1]; camera.position.lerpVectors(a, b, hop.seg[i] ? Math.min(1, d / hop.seg[i]) : 1);
+      if (!hop.keepYaw && Math.hypot(b.x - a.x, b.z - a.z) > .5) { const ty = Math.atan2(-(b.x - a.x), -(b.z - a.z)); yaw += Math.atan2(Math.sin(ty - yaw), Math.cos(ty - yaw)) * Math.min(1, rdt * 5); }
+      if (hop.t >= 1) { const to = hop.h.to; hop = null; Object.assign(state, { spot: to, room: to.room, floor: to.f }); syncUI(); refreshHops(); }
+    }
+    if (keys['arrowleft'] || keys['a']) yawV += dt * 1.4; if (keys['arrowright'] || keys['d']) yawV -= dt * 1.4;
     yaw += yawV * k * 1.6; pitch = Math.max(-1.1, Math.min(1.1, pitch + pitchV * k * 1.6)); yawV *= (1 - k); pitchV *= (1 - k);
     if (tour && tour.steps[tour.i]?.room) yaw += dt * .05;
     eul.set(-pitch, yaw, 0); camera.quaternion.setFromEuler(eul);
   } else controls.update();
 
+  const tf = viewFov(); if (Math.abs(camera.fov - tf) > .02) { camera.fov = lerp(camera.fov, tf, Math.min(1, rdt * 6)); camera.updateProjectionMatrix(); }
   // section cut that follows the camera: floors above slide away instead of popping
   const lv = LEVEL[state.floor];
   let target = 400;
   if (state.mode === 'floor') target = lv + 6.4;
   const dbl = state.mode === 'room' && state.room === 'living', ceilY = lv + (dbl ? 22 : 10.15);
-  if (state.mode === 'room') target = camera.position.y < ceilY ? lv + (dbl ? 23.9 : 11.38) : lv + 6.4;
+  const onStair = hop && hop.floors[0] !== hop.floors[1];
+  if (state.mode === 'room') target = onStair ? Math.max(LEVEL[hop.floors[0]], LEVEL[hop.floors[1]]) + 11.38 : camera.position.y < ceilY ? lv + (dbl ? 23.9 : 11.38) : lv + 6.4;
   clipY = fly && state.mode !== 'room' && target < clipY ? lerp(clipY, target, Math.min(1, rdt * 2.2)) : lerp(clipY, target, Math.min(1, rdt * 3));
   if (Math.abs(clipY - target) < .02) clipY = target;
   clipPlane.constant = clipY;
   ['g', 'f', 's'].forEach(f => {
     FG[f].root.visible = clipY > LEVEL[f] + .05;
-    FG[f].ceil.visible = state.mode === 'room' && (f === state.floor || (dbl && f === 'f')) && camera.position.y < ceilY;
+    FG[f].ceil.visible = state.mode === 'room' && !onStair && (f === state.floor || (dbl && f === 'f')) && camera.position.y < ceilY;
   });
   ROOF.visible = clipY > 35.5;
 
@@ -1699,7 +1806,7 @@ function loop() {
   RIG_PTS.forEach(l => l.intensity = lerp(l.intensity, inside ? .5 : 0, k)); RIG_SPOTS.forEach(l => l.intensity = lerp(l.intensity, inside ? .9 : 0, k)); RIG_SHADOW.intensity = lerp(RIG_SHADOW.intensity, inside ? .55 : 0, k);
   renderer.toneMappingExposure = lerp(renderer.toneMappingExposure, inside ? .95 : .92, k);
 
-  for (const w of MODEL_WRAPS) w.visible = state.mode === 'ext' ? w.userData.out : (w.userData.f === state.floor || (w.userData.out && w.userData.f !== null && LEVEL[w.userData.f] <= lv));
+  for (const w of MODEL_WRAPS) w.visible = state.mode === 'ext' ? w.userData.out : (w.userData.f === state.floor || (onStair && hop.floors.includes(w.userData.f)) || (w.userData.out && w.userData.f !== null && LEVEL[w.userData.f] <= lv));
   WATER_TEX[0].offset.y += rdt * .55; WATER_TEX[1].offset.y += rdt * .8;
   if (tour) { const st = tour.steps[tour.i]; if (!fly) tour.t += rdt; if (st && tour.t > st.d) nextStep(); }
   const showL = state.mode === 'floor' && !fly;
@@ -1710,6 +1817,14 @@ function loop() {
     const vis = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
     L.el.hidden = !vis;
     if (vis) { L.el.style.left = ((tmp.x + 1) / 2 * canvas.clientWidth) + 'px'; L.el.style.top = ((1 - tmp.y) / 2 * canvas.clientHeight) + 'px'; }
+  });
+  const showH = state.mode === 'room' && !fly && !hop;
+  hotEls.forEach((el, i) => {
+    const h = HOPS[i]; if (!showH || !h) { if (!el.hidden) el.hidden = true; return; }
+    const p = P3(h.to), c = camera.position, dx = p.x - c.x, dz = p.z - c.z, dist = Math.hypot(dx, dz), s = dist > 11 ? 11 / dist : 1;
+    tmp.set(c.x + dx * s, feetY(state.floor) + (h.kind === 'up' ? 4.6 : h.kind === 'down' ? 2.2 : 3.2), c.z + dz * s).project(camera);
+    const vis = tmp.z < 1 && Math.abs(tmp.x) < .95 && Math.abs(tmp.y) < .95; el.hidden = !vis;
+    if (vis) { el.style.left = ((tmp.x + 1) / 2 * canvas.clientWidth) + 'px'; el.style.top = ((1 - tmp.y) / 2 * canvas.clientHeight) + 'px'; }
   });
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
